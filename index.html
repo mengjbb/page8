@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>设备资产信息管理</title>
+    <style>
+        /* ========== 全局配置变量（新增：中间表头透明度可调）========== */
+        :root {
+            /* LOGO PC端配置 */
+            --logo-pc-width: 200px;
+            --logo-pc-height: 200px;
+            --logo-pc-left: 10px;
+            --logo-pc-top: 200px;
+            
+            /* LOGO 移动端配置 */
+            --logo-mobile-width: 70px;
+            --logo-mobile-height: 70px;
+            --logo-mobile-left: 5px;
+            --logo-mobile-top: 125%;
+
+            /* 标题字体配置 */
+            --title-pc-font-size: 2.2rem;
+            --title-mobile-font-size: 1.5rem;
+            --title-font-weight: 700;
+            --title-color: #333;
+
+            /* 标题背景容器大小配置 */
+            --title-container-pc-height: 150px;
+            --title-container-mobile-height: 120px;
+            --title-container-width: 100%;
+
+            /* 表格列宽统一配置 */
+            --date-col-width: 100px;
+            --person-col-width: 90px;
+            --remark-col-width: 100px;
+            --img-cell-pc-width: 200px;
+            --img-cell-pc-height: 80px;
+            --img-cell-mobile-width: 150px;
+            --img-cell-mobile-height: 50px;
+            --img-fit-mode: cover;
+            /* 设备主体图片单元格尺寸（PC+移动端） */
+            --device-img-cell-pc-width: 500px;
+            --device-img-cell-pc-height: 240px;
+            --device-img-cell-mobile-width: 300px;
+            --device-img-cell-mobile-height: 160px;
+            
+            /* 其他基础配置 */
+            --bg-opacity: 1;
+
+            /* 核心优化配置项 */
+            --content-bg-img: url("页面图/bgbj.jpg"); /* 标题下背景图片（自行替换路径） */
+            --content-bg-opacity: 0; /* 【修改】标题下背景透明度改为0，去掉朦胧感 */
+            --table-border-width: 2px; /* 表格框线粗细 */
+            --table-border-color: #ccc; /* 表格框线颜色 */
+            --th-bg-opacity: 0.5; /* 表头单元格底色透明度 */
+            --td-bg-opacity: 0.5; /* 内容单元格底色透明度 */
+            /* 中间可调背景容器配置（可直接修改） */
+            --middle-container-bg: url("页面图/bgbj.jpg"); /* 中间容器背景图（自行替换） */
+            --middle-container-opacity: 0.8; /* 中间容器背景透明度 */
+            --middle-header-height: 60px; /* 中间表头容器高度 */
+            --middle-header-color: #333; /* 中间表头文字颜色 */
+            --middle-header-font-size: 1.4rem; /* 中间表头文字大小 */
+            --middle-header-opacity: 0; /* 【核心】中间表头透明度（0-1自由可调） */
+            
+            /* 版本号配置（新增） */
+            --version-text: "Rev 0"; /* 版本号文本 */
+            --version-font-size: 0.9rem; /* 版本号字体大小 */
+            --version-color: #666; /* 版本号颜色 */
+            --version-left: auto; /* 版本号左侧位置 */
+            --version-right: 20px; /* 版本号右侧位置（可调） */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", Arial, sans-serif;
+        }
+        body {
+            width: 100%;
+            min-width: 320px;
+            margin: 0 auto;
+            padding: 10px;
+            background-color: #f5f5f5;
+            font-size: 14px;
+            overflow: auto; /* 【修复】改为auto，允许滚动 */
+            height: 100vh;
+            position: relative; /* 【修复】添加相对定位 */
+        }
+        .device-box {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 15px;
+            height: calc(100vh - 20px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* 【修复】内部滚动由子容器处理 */
+        }
+        h2 {
+            color: #444;
+            margin: 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 1.2rem;
+            position: relative;
+            z-index: 2;
+        }
+        /* 表格容器：移动端横向滚动 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 10px 0;
+            position: relative;
+            z-index: 2;
+        }
+        table {
+            width: 100%;
+            min-width: 600px;
+            border-collapse: collapse;
+            position: relative;
+            z-index: 2;
+        }
+        /* 表格样式核心配置 */
+        th, td {
+            border: var(--table-border-width) solid var(--table-border-color);
+            padding: 8px 6px;
+            text-align: center !important;
+            vertical-align: middle;
+            font-size: 13px;
+            position: relative;
+            z-index: 2;
+        }
+        th {
+            background-color: rgba(248, 248, 248, var(--th-bg-opacity));
+            white-space: nowrap;
+        }
+        td {
+            background-color: rgba(255, 255, 255, var(--td-bg-opacity));
+            word-break: break-all;
+        }
+
+        /* 表格列宽统一配置 */
+        #checkTable th:nth-child(1), #checkTable td:nth-child(1),
+        #replaceTable th:nth-child(1), #replaceTable td:nth-child(1),
+        #repairTable th:nth-child(1), #repairTable td:nth-child(1) {
+            width: var(--date-col-width);
+            white-space: nowrap;
+        }
+        #checkTable th:nth-child(3), #checkTable td:nth-child(3),
+        #replaceTable th:nth-child(4), #replaceTable td:nth-child(4),
+        #repairTable th:nth-child(4), #repairTable td:nth-child(4) {
+            width: var(--person-col-width);
+            white-space: nowrap;
+        }
+        #checkTable th:last-child, #checkTable td:last-child,
+        #replaceTable th:last-child, #replaceTable td:last-child,
+        #repairTable th:last-child, #repairTable td:last-child {
+            width: var(--remark-col-width);
+        }
+
+        /* 图片单元格统一样式 + hover不抖动修复 */
+        #checkTable .img-cell, #replaceTable .img-cell, #repairTable .img-cell {
+            width: var(--img-cell-pc-width);
+            height: var(--img-cell-pc-height);
+            padding: 0 !important;
+            vertical-align: middle;
+            overflow: hidden;
+        }
+        #deviceBaseInfoTable .device-img-cell {
+            width: var(--device-img-cell-pc-width);
+            height: var(--device-img-cell-pc-height);
+            padding: 0 !important;
+            vertical-align: middle;
+            overflow: hidden;
+            border: var(--table-border-width) solid var(--table-border-color);
+        }
+        .table-img {
+            width: 100%;
+            height: 100%;
+            object-fit: var(--img-fit-mode);
+            object-position: center;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid #eee;
+            transition: all 0.2s;
+            display: block;
+            transform-origin: center center;
+        }
+        .table-img:hover {
+            transform: scale(1.05);
+            border-color: #2196F3;
+        }
+        .no-img {
+            color: #999;
+            font-size: 12px;
+            display: inline-block;
+            width: 100%;
+            height: 100%;
+            line-height: var(--img-cell-pc-height);
+        }
+        #deviceBaseInfoTable .no-img {
+            line-height: var(--device-img-cell-pc-height);
+            font-size: 14px;
+        }
+
+        /* LOGO+标题布局 */
+        .title-container {
+            position: relative;
+            margin-bottom: 20px;
+            width: var(--title-container-width);
+            height: var(--title-container-pc-height);
+            margin-left: auto;
+            margin-right: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: url("页面图/background.jpg") no-repeat center center;
+            background-size: 100% 100%;
+            background-color: transparent;
+            z-index: 2;
+            flex-shrink: 0;
+        }
+        .bg-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            opacity: calc(1 - var(--bg-opacity));
+            pointer-events: none;
+            z-index: 1;
+        }
+        .custom-logo {
+            position: absolute;
+            left: var(--logo-pc-left);
+            top: var(--logo-pc-top);
+            transform: translateY(-50%);
+            width: var(--logo-pc-width);
+            height: var(--logo-pc-height);
+            object-fit: contain;
+            z-index: 3;
+        }
+        .main-title {
+            margin: 0;
+            padding: 0 20px;
+            font-size: var(--title-pc-font-size);
+            font-weight: var(--title-font-weight);
+            color: var(--title-color);
+            z-index: 3;
+            position: relative;
+            white-space: nowrap;
+        }
+
+        /* 图片预览弹窗 */
+        .img-preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+        }
+        .img-preview-content {
+            position: relative;
+            max-width: 95%;
+            max-height: 80vh;
+        }
+        .preview-img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+        .close-preview {
+            position: absolute;
+            top: -35px;
+            right: 0;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            width: 35px;
+            height: 35px;
+            text-align: center;
+            line-height: 35px;
+        }
+
+        /* 标题与表格之间的可调背景中间容器 */
+        .middle-bg-container {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 1;
+            display: flex; /* 【修复】添加flex布局 */
+            flex-direction: column; /* 【修复】垂直方向排列 */
+        }
+        /* 中间容器背景层 */
+        .middle-bg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--middle-container-bg) no-repeat center center;
+            background-size: cover;
+            opacity: var(--middle-container-opacity);
+            z-index: 1;
+            pointer-events: none;
+        }
+        /* 中间表头容器（核心：透明度可调+固定顶部） */
+        .middle-header {
+            position: relative;
+            z-index: 3;
+            height: var(--middle-header-height);
+            background-color: rgba(250, 250, 250, var(--middle-header-opacity));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px;
+            /* border-bottom: 2px solid var(--table-border-color); 【修改】注释掉，去掉灰线 */
+            color: var(--middle-header-color);
+            font-size: var(--middle-header-font-size);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        /* 版本号样式（新增） */
+        .version-info {
+            position: absolute;
+            right: var(--version-right);
+            left: var(--version-left);
+            font-size: var(--version-font-size);
+            color: var(--version-color);
+            font-weight: normal;
+            white-space: nowrap;
+        }
+        /* 表格专属滚动容器 */
+        .table-scroll-container {
+            position: relative;
+            z-index: 2;
+            flex: 1; /* 【修复】占据剩余空间 */
+            min-height: 0; /* 【修复】关键！允许flex子元素滚动 */
+            overflow-y: auto; /* 【修复】启用纵向滚动 */
+            -webkit-overflow-scrolling: touch; /* 【修复】iOS流畅滚动 */
+            padding: 15px;
+        }
+        /* 原内容背景容器适配新结构 */
+        .content-bg-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            z-index: 2;
+        }
+        .content-bg-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: transparent; /* 【修改】改为透明，去掉朦胧感 */
+            opacity: calc(1 - var(--content-bg-opacity));
+            pointer-events: none;
+            z-index: 1;
+        }
+        .content-main {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* 移动端适配（768px以下） */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+                font-size: 13px;
+                overflow: auto; /* 【修复】允许滚动 */
+                height: 100vh;
+            }
+            .device-box {
+                padding: 10px;
+                margin-bottom: 10px;
+                height: calc(100vh - 10px);
+                overflow: hidden; /* 【修复】内部滚动由子容器处理 */
+            }
+            h2 {
+                font-size: 1rem;
+                margin: 10px 0;
+            }
+            th, td {
+                padding: 6px 4px;
+                font-size: 12px;
+                border: var(--table-border-width) solid var(--table-border-color);
+            }
+
+            /* 移动端LOGO/标题适配 */
+            .custom-logo {
+                left: var(--logo-mobile-left);
+                top: var(--logo-mobile-top);
+                width: var(--logo-mobile-width);
+                height: var(--logo-mobile-height);
+            }
+            .main-title {
+                font-size: var(--title-mobile-font-size);
+            }
+            .title-container {
+                height: var(--title-container-mobile-height);
+                margin-bottom: 10px;
+            }
+
+            /* 移动端图片单元格适配 */
+            #checkTable .img-cell, #replaceTable .img-cell, #repairTable .img-cell {
+                width: var(--img-cell-mobile-width);
+                height: var(--img-cell-mobile-height);
+                overflow: hidden;
+            }
+            .no-img {
+                line-height: var(--img-cell-mobile-height);
+            }
+            #deviceBaseInfoTable .device-img-cell {
+                width: var(--device-img-cell-mobile-width);
+                height: var(--device-img-cell-mobile-height);
+            }
+            #deviceBaseInfoTable .no-img {
+                line-height: var(--device-img-cell-mobile-height);
+                font-size: 12px;
+            }
+
+            /* 移动端中间容器适配 + 表头透明度优化 */
+            :root {
+                --middle-header-height: 45px;
+                --middle-header-font-size: 1.1rem;
+                --middle-container-opacity: 0.8;
+                --middle-header-opacity: 0; /* 移动端提升透明度，保证文字可读性 */
+                --version-font-size: 0.8rem; /* 移动端版本号字体大小 */
+                --version-right: 10px; /* 移动端版本号右侧位置 */
+            }
+            .table-scroll-container {
+                padding: 10px;
+            }
+        }
+
+        /* 平板适配（768-1024px） */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            :root {
+                --logo-pc-width: 120px;
+                --logo-pc-height: 120px;
+                --img-cell-pc-width: 60px;
+                --img-cell-pc-height: 60px;
+                --title-pc-font-size: 1.8rem;
+                --content-bg-opacity: 0; /* 【修改】平板端也改为0 */
+                --table-border-width: 1.5px;
+                --device-img-cell-pc-width: 150px;
+                --device-img-cell-pc-height: 200px;
+                /* 平板中间容器配置 */
+                --middle-header-height: 50px;
+                --middle-header-font-size: 1.2rem;
+                --middle-header-opacity: 0; /* 平板端中等透明度 */
+                --version-font-size: 0.85rem; /* 平板端版本号字体大小 */
+                --version-right: 15px; /* 平板端版本号右侧位置 */
+            }
+            h2 {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 省略HTML内容，保持不变 -->
+    <!-- 设备信息展示模块 -->
+    <div class="device-box">
+        <!-- 原有标题区域：保持不变 -->
+        <div class="title-container">
+            <div class="bg-mask"></div>
+            <img src="页面图/logo.jpg" class="custom-logo" alt="设备管理系统LOGO">            
+        </div>
+        <!-- 标题与表格之间的可调背景中间容器 -->
+        <div class="middle-bg-container">
+            <!-- 中间容器背景层：可自定义背景图/颜色 -->
+            <div class="middle-bg-layer"></div>
+            <!-- 中间表头容器（设备全生命周期记录台账）：透明度可调 -->
+            <div class="middle-header">
+                <span>设备资产信息记录</span>
+                <span class="version-info">版本号：Rev 0</span>
+            </div>
+            <!-- 表格专属滚动容器（仅此处纵向滚动） -->
+            <div class="table-scroll-container">
+                <!-- 原有内容背景容器：结构不变，适配新层级 -->
+                <div class="content-bg-container">
+                    <!-- 背景遮罩：已改为透明 -->
+                    <div class="content-bg-mask"></div>
+                    <!-- 内容主体：承载所有表格 -->
+                    <div class="content-main">
+                        <!-- 基础资产信息 -->
+                         <h2>基础资产信息</h2>
+                        <div class="table-container">
+                            <table id="deviceBaseInfoTable">
+                                <tr>
+                                    <th>站位名称</th><td>PACK组装</td>
+                                    <th rowspan="6">站位主体</th>
+                                    <td rowspan="6" class="device-img-cell">
+                                        <img src="设备图/设备主体.jpg" alt="站位主体图片" class="table-img" onclick="openImgPreview('设备图/设备主体.jpg')">
+                                    </td>
+                                </tr>
+                                <tr><th>设备名称</th><td>航架吊装设备</td></tr>
+                                <tr><th>使用部门</th><td>PACK生产</td></tr>
+                                <tr><th>安装日期</th><td>2025-09-01</td></tr>
+                                <tr><th>使用寿命</th><td>20年</td></tr>
+                                <tr><th>设备责任人</th><td>设备部-杨鹏</td></tr>
+                            </table>
+                        </div>
+
+                        <!-- 动态生成的记录表区域 -->
+                        <div id="recordTablesContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览弹窗 -->
+    <div class="img-preview-modal" id="imgPreviewModal" onclick="closeImgPreview()">
+        <div class="img-preview-content" onclick="event.stopPropagation()">
+            <span class="close-preview" id="closePreviewBtn">&times;</span>
+            <img src="" alt="图片预览" class="preview-img" id="previewImg">
+        </div>
+    </div>
+
+    <script>
+        // ===================== 核心配置区 =====================
+        const RECORD_TABLE_CONFIGS = {
+            checkRecords: {
+                title: "定期维保记录",
+                tableId: "checkTable",
+                columns: [
+                    { key: "date", label: "维保日期" },
+                    { key: "content", label: "维保内容" },
+                    { key: "name", label: "维保人" },
+                    { key: "img", label: "维保图片", type: "img" },
+                    { key: "expdate", label: "维保有效期" },
+                    { key: "remark", label: "备注" }
+                ],
+                rows: [
+                    { date: "2025-12-15", content: "悬臂重要部位螺钉紧固", name: "张炎", img: "设备图/maintenance1.jpg", expdate: "六个月",remark:"" },
+                    { date: "2025-12-15", content: "吊具螺钉紧固", name: "何海鑫", img: "设备图/maintenance2.jpg", expdate: "六个月", remark:"" },
+                    { date: "2025-12-15", content: "接线线路检查", name: "霍明", img: "设备图/maintenance3.jpg", expdate: "六个月", remark:"" },
+                   { date: "2025-12-15", content: "地线检查", name: "霍明", img: "设备图/maintenance4.jpg", expdate: "六个月", remark:"" },
+                ]
+            },
+            replaceRecords: {
+                title: "易损件更换记录",
+                tableId: "replaceTable",
+                columns: [
+                    { key: "date", label: "更换日期" },
+                    { key: "part", label: "易损件名称" },
+                    { key: "reason", label: "更换原因" },
+                    { key: "name", label: "更换人" },
+                    { key: "img", label: "更换图片", type: "img" },
+                    { key: "remark", label: "备注" }
+                ],
+                rows: [
+                    { date: "", part: "", reason: "", name: "", img: "设备图/replace1.jpg" },
+                   
+                ]
+            },
+            repairRecords: {
+                title: "设备维修记录",
+                tableId: "repairTable",
+                columns: [
+                    { key: "date", label: "维修日期" },
+                    { key: "content", label: "维修内容" },
+                    { key: "fault", label: "故障描述" },
+                    { key: "engineer", label: "维修工程师" },
+                    { key: "img", label: "维修图片", type: "img" },
+                    { key: "remark", label: "备注" }
+                ],
+                rows: [
+                    { date: "", content: "", fault: "", engineer: "",  img: "设备图/repair1.jpg" },
+                   
+                ]
+            }
+        };
+        // ===================== 配置区结束 =====================
+
+        // 动态生成所有记录表
+        function generateRecordTablesHtml() {
+            const container = document.getElementById('recordTablesContainer');
+            let html = '';
+            for (const tableKey in RECORD_TABLE_CONFIGS) {
+                const config = RECORD_TABLE_CONFIGS[tableKey];
+                html += `<h2>${config.title}</h2>`;
+                html += `<div class="table-container"><table id="${config.tableId}"></table></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // 渲染指定表格
+        function renderTable(tableKey) {
+            const config = RECORD_TABLE_CONFIGS[tableKey];
+            const table = document.getElementById(config.tableId);
+            const rowsData = config.rows || [];
+
+            let headerHtml = '<tr>';
+            config.columns.forEach(col => {
+                headerHtml += `<th>${col.label}</th>`;
+            });
+            headerHtml += '</tr>';
+            table.innerHTML = headerHtml;
+
+            rowsData.forEach((item) => {
+                const row = table.insertRow(-1);
+                let cellHtml = '';
+                config.columns.forEach(col => {
+                    const cellValue = item[col.key] || '';
+                    if (col.type === 'img') {
+                        cellHtml += cellValue ? 
+                            `<td class="img-cell"><img src="${cellValue}" alt="${col.label}" class="table-img" onclick="openImgPreview('${cellValue}')"></td>` :
+                            `<td class="img-cell"><span class="no-img">暂无图片</span></td>`;
+                    } else {
+                        cellHtml += `<td>${cellValue}</td>`;
+                    }
+                });
+                row.innerHTML = cellHtml;
+            });
+
+            if (rowsData.length === 0) {
+                const emptyRow = table.insertRow(-1);
+                const emptyCell = emptyRow.insertCell(0);
+                emptyCell.colSpan = config.columns.length;
+                emptyCell.textContent = "暂无记录数据";
+                emptyCell.style.padding = "15px";
+                emptyCell.style.color = "#999";
+            }
+        }
+
+        // 图片预览相关
+        function openImgPreview(imgSrc) {
+            const modal = document.getElementById('imgPreviewModal');
+            const previewImg = document.getElementById('previewImg');
+            previewImg.src = imgSrc;
+            modal.style.display = "flex";
+            document.body.style.overflow = "hidden";
+        }
+        function closeImgPreview() {
+            const modal = document.getElementById('imgPreviewModal');
+            modal.style.display = "none";
+            document.body.style.overflow = "auto";
+        }
+
+        // 渲染所有表格
+        function renderAllTables() {
+            for (const tableKey in RECORD_TABLE_CONFIGS) {
+                renderTable(tableKey);
+            }
+        }
+
+        // 页面初始化
+        window.onload = function() {
+            generateRecordTablesHtml();
+            renderAllTables();
+            document.getElementById('closePreviewBtn').addEventListener('click', closeImgPreview);
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeImgPreview();
+            });
+            
+            // 【修复】解决iOS Safari等浏览器滚动问题
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream) {
+                // iOS设备特殊处理
+                const scrollContainer = document.querySelector('.table-scroll-container');
+                if (scrollContainer) {
+                    scrollContainer.addEventListener('touchmove', function(e) {
+                        // 允许滚动
+                    }, { passive: true });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
